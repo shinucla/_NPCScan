@@ -1,7 +1,7 @@
 --[[****************************************************************************
-  * _NPCScan by Saiket                                                         *
-  * _NPCScan.Config.lua - Adds an options pane to the Interface Options menu.  *
-  ****************************************************************************]]
+   * _NPCScan by Saiket                                                         *
+   * _NPCScan.Config.lua - Adds an options pane to the Interface Options menu.  *
+   ****************************************************************************]]
 
 
 local _NPCScan = select( 2, ... );
@@ -21,55 +21,55 @@ me.AlertSound = CreateFrame( "Frame", "_NPCScanConfigSoundDropdown", AlertOption
 
 --- Builds a standard tooltip for a control.
 function me:ControlOnEnter ()
-	GameTooltip:SetOwner( self, "ANCHOR_TOPRIGHT" );
-	GameTooltip:SetText( self.tooltipText, nil, nil, nil, nil, 1 );
+   GameTooltip:SetOwner( self, "ANCHOR_TOPRIGHT" );
+   GameTooltip:SetText( self.tooltipText, nil, nil, nil, nil, 1 );
 end
 
 
 --- Sets the CacheWarnings option when its checkbox is clicked.
 function me.CacheWarnings.setFunc ( Enable )
-	_NPCScan.SetCacheWarnings( Enable == "1" );
+   _NPCScan.SetCacheWarnings( Enable == "1" );
 end
 
 --- Plays a fake found alert and shows the target button.
 function me.Test:OnClick ()
-	local Name = L.CONFIG_TEST_NAME;
-	_NPCScan.Print( L.FOUND_FORMAT:format( Name ), GREEN_FONT_COLOR );
-	_NPCScan.Print( L.CONFIG_TEST_HELP_FORMAT:format( GetModifiedClick( "_NPCSCAN_BUTTONDRAG" ) ) );
+   local Name = L.CONFIG_TEST_NAME;
+   _NPCScan.Print( L.FOUND_FORMAT:format( Name ), GREEN_FONT_COLOR );
+   _NPCScan.Print( L.CONFIG_TEST_HELP_FORMAT:format( GetModifiedClick( "_NPCSCAN_BUTTONDRAG" ) ) );
 
-	_NPCScan.Button:SetNPC( "player", Name );
+   _NPCScan.Button:SetNPC( "player", Name );
 end
 --- Sets the AlertSoundUnmute option when its checkbox is clicked.
 function me.AlertSoundUnmute.setFunc ( Enable )
-	_NPCScan.SetAlertSoundUnmute( Enable == "1" );
+   _NPCScan.SetAlertSoundUnmute( Enable == "1" );
 end
 --- Sets an alert sound chosen from the LibSharedMedia dropdown.
 function me.AlertSound:OnSelect ( NewValue )
-	_NPCScan.Button.PlaySound( NewValue ); -- Play sample
-	_NPCScan.SetAlertSound( NewValue );
+   _NPCScan.Button.PlaySound( NewValue ); -- Play sample
+   _NPCScan.SetAlertSound( NewValue );
 end
 --- Builds a dropdown menu for alert sounds with LibSharedMedia options.
 function me.AlertSound:initialize ()
-	local Value = _NPCScan.Options.AlertSound;
+   local Value = _NPCScan.Options.AlertSound;
 
-	local Info = UIDropDownMenu_CreateInfo();
-	Info.func = self.OnSelect;
-	Info.text = L.CONFIG_ALERT_SOUND_DEFAULT;
-	Info.checked = Value == nil;
-	UIDropDownMenu_AddButton( Info );
+   local Info = UIDropDownMenu_CreateInfo();
+   Info.func = self.OnSelect;
+   Info.text = L.CONFIG_ALERT_SOUND_DEFAULT;
+   Info.checked = Value == nil;
+   UIDropDownMenu_AddButton( Info );
 
-	local LSM = LibStub( "LibSharedMedia-3.0" );
-	for _, Key in ipairs( LSM:List( LSM.MediaType.SOUND ) ) do
-		Info.text, Info.arg1 = Key, Key;
-		Info.checked = Value == Key;
-		UIDropDownMenu_AddButton( Info );
-	end
+   local LSM = LibStub( "LibSharedMedia-3.0" );
+   for _, Key in ipairs( LSM:List( LSM.MediaType.SOUND ) ) do
+      Info.text, Info.arg1 = Key, Key;
+      Info.checked = Value == Key;
+      UIDropDownMenu_AddButton( Info );
+   end
 end
 
 
 --- Reverts to default options.
 function me:default ()
-	_NPCScan.Synchronize(); -- Resets all
+   _NPCScan.Synchronize(); -- Resets all
 end
 
 
