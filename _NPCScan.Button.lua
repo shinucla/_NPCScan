@@ -18,7 +18,7 @@ me.PendingName, me.PendingID = nil;
 me.RotationRate = math.pi / 4;
 me.RaidTargetIcon = 4; -- Green triangle
 
-me.ModelDefaultScale = 0.75;
+me.ModelDefaultScale = 1; --0.75; --Kevin
 --- @description Key is lowercase, value = "[Scale]|[X]|[Y]|[Z]", where any parameter can be left empty
 me.ModelCameras = {
    [ [[creature\spectraltigerferal\spectraltigerferal.m2]] ] = "||-.25|1"; -- Gondria
@@ -45,30 +45,31 @@ me.ModelCameras = {
 --- Plays an alert sound, temporarily enabling sound if necessary.
 -- @param AlertSound  A LibSharedMedia sound key, or nil to play the default.
 function me.PlaySound ( AlertSound )
-   local SoundEnableChanged, SoundInBGChanged;
-   if ( _NPCScan.Options.AlertSoundUnmute ) then
-      if ( not GetCVarBool( "Sound_EnableAllSound" ) ) then
-         SoundEnableChanged = true;
-         SetCVar( "Sound_EnableAllSound", 1 );
-      end
-      if ( not GetCVarBool( "Sound_EnableSoundWhenGameIsInBG" ) ) then
-         SoundInBGChanged = true;
-         SetCVar( "Sound_EnableSoundWhenGameIsInBG", 1 );
-      end
-   end
-   if ( AlertSound == nil ) then -- Default
-      PlaySoundFile( [[Sound\Event Sounds\Event_wardrum_ogre.wav]] );
-      PlaySoundFile( [[Sound\Events\scourge_horn.wav]] );
-   else
-      local LSM = LibStub( "LibSharedMedia-3.0" );
-      PlaySoundFile( LSM:Fetch( LSM.MediaType.SOUND, AlertSound ) );
-   end
-   if ( SoundEnableChanged ) then
-      SetCVar( "Sound_EnableAllSound", 0 );
-   end
-   if ( SoundInBGChanged ) then
-      SetCVar( "Sound_EnableSoundWhenGameIsInBG", 0 );
-   end
+   PlaySound("PVPTHROUGHQUEUE");
+   -- local SoundEnableChanged, SoundInBGChanged;
+   -- if ( _NPCScan.Options.AlertSoundUnmute ) then
+   --    if ( not GetCVarBool( "Sound_EnableAllSound" ) ) then
+   --       SoundEnableChanged = true;
+   --       SetCVar( "Sound_EnableAllSound", 1 );
+   --    end
+   --    if ( not GetCVarBool( "Sound_EnableSoundWhenGameIsInBG" ) ) then
+   --       SoundInBGChanged = true;
+   --       SetCVar( "Sound_EnableSoundWhenGameIsInBG", 1 );
+   --    end
+   -- end
+   -- if ( AlertSound == nil ) then -- Default
+   --    PlaySoundFile( [[Sound\Event Sounds\Event_wardrum_ogre.wav]] );
+   --    PlaySoundFile( [[Sound\Events\scourge_horn.wav]] );
+   -- else
+   --    local LSM = LibStub( "LibSharedMedia-3.0" );
+   --    PlaySoundFile( LSM:Fetch( LSM.MediaType.SOUND, AlertSound ) );
+   -- end
+   -- if ( SoundEnableChanged ) then
+   --    SetCVar( "Sound_EnableAllSound", 0 );
+   -- end
+   -- if ( SoundInBGChanged ) then
+   --    SetCVar( "Sound_EnableSoundWhenGameIsInBG", 0 );
+   -- end
 end
 
 
@@ -82,7 +83,8 @@ function me:SetNPC ( ID, Name )
       _NPCScan.Overlays.Found( ID );
    end
 
-   self.PlaySound( _NPCScan.Options.AlertSound );
+   -- _NPCScan.Options.AlertSound
+   self.PlaySound( "PVPTHROUGHQUEUE" ); -- QUESTADDED, QUESTCOMPLETED, PVPTHROUGHQUEUE,
    if ( GetCVarBool( "screenEdgeFlash" ) ) then
       self.Flash:Show();
       self.Flash.Fade:Pause(); -- Forces OnPlay to fire again if it was already playing
@@ -102,25 +104,43 @@ end
 -- @param ID  A numeric NpcID or string UnitID.
 -- @param Name  Localized name of the unit.  If ID is an NpcID, Name is used in the targetting macro.
 function me:Update ( ID, Name )
+   if ( type(ID) ~= "number") then
+      ID = (UnitName(ID) and ID or "target"); -- added by Kevin
+   end
+
    if ( type( self.ID ) == "number" ) then -- Remove last overlay
       _NPCScan.Overlays.Remove( self.ID );
    end
-   self.ID = ID;
 
+   self.ID = ID;
    self:SetText( Name );
+
    local Model = self.Model;
    Model:Reset();
+
    if ( type( ID ) == "number" ) then -- ID is NPC ID
       Model.UnitID = nil;
       Model:SetCreature( ID );
       self:UnregisterEvent( "UNIT_MODEL_CHANGED" );
+
    else -- ID is UnitID
       Model.UnitID = ID;
       Model:SetUnit( ID );
-      Name = ID;
+      --Name = UnitName(ID) or ID; -- commented out by Kevin
       self:RegisterEvent( "UNIT_MODEL_CHANGED" );
    end
-   self:SetAttribute( "macrotext", "/cleartarget\n/targetexact "..Name );
+
+   --self:SetAttribute( "macrotext", "/cleartarget\n/targetexact "..Name.."\n/scan test" );
+
+   --Kevin's custom macrotext
+   local targetText = "/cleartarget\n/targetexact "..Name;
+   local reloadText = (UnitName("target") == Name --[[and CheckInteractDistance("target", 1)]] and "" or "\n/scan test");
+   local say = "\n/run if (CheckInteractDistance(\"target\", 1)) then SendChatMessage(\"kill "..Name.."\") end";
+   local grip = "\n/cast Death Grip";
+   local rangedText = (UnitName("target") == Name and CheckInteractDistance("target", 1) and grip or "");
+   --self:SetText( ID..", "..Name ); --- debug by Kevin
+
+   self:SetAttribute( "macrotext", targetText..reloadText..grip );
    self:PLAYER_TARGET_CHANGED(); -- Updates the target icon
 
    self:Show();
@@ -285,11 +305,11 @@ function me.Model:OnUpdate ( Elapsed )
 end
 
 
-
-
 me:SetScale( 1.25 );
 me:SetSize( 150, 42 );
-me:SetPoint( "BOTTOM", UIParent, 0, 128 );
+--me:SetPoint( "BOTTOM", UIParent, 0, 128 );
+--me:SetPoint( "CENTER", UIParent, -100, -10 );
+--me:SetPoint( lastSavedPoint["point"], UIParent, lastSavedPoint["xOfs"], lastSavedPoint["yOfs"] );
 me:SetMovable( true );
 me:SetUserPlaced( true );
 me:SetClampedToScreen( true );
@@ -418,3 +438,21 @@ me:SetScript( "OnEvent", _NPCScan.Frame.OnEvent );
 me:HookScript( "OnShow", me.OnShow );
 me:HookScript( "OnHide", me.OnHide );
 me:RegisterEvent( "PLAYER_REGEN_ENABLED" );
+
+me:SetScript("OnMouseDown",
+   function (self, button)
+      if button=='LeftButton' then
+         self:StartMoving();
+      end
+   end
+);
+
+me:SetScript("OnMouseUp",
+             function (self, button)
+                self:StopMovingOrSizing();
+                --local point, r, rp, xofs, yofs = me:GetPoint();
+                --_NPCScanOptionsCharacter.LastPoint["point"] = point;
+                --_NPCScanOptionsCharacter.LastPoint["xOfs"] = xofs;
+                --_NPCScanOptionsCharacter.LastPoint["yOfs"] = yofs;
+             end
+);

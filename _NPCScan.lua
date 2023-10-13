@@ -3,6 +3,46 @@
    * _NPCScan.lua - Scans NPCs near you for specific rare NPC IDs.              *
    ****************************************************************************]]
 
+--[[
+   -> me.Frame:ZONE_CHANGED_NEW_AREA()
+   -> me.Synchronize( Options, OptionsCharacter)
+   ->    NPCAdd() -> NPCActivate()
+   ->    NPCAdd() -> NPCActivate()
+   ->    NPCAdd() -> NPCActivate()
+   ->    ...
+   -> ...
+   -> me.ChacheListBuild()
+   ->
+   -> me.Frame:PLAYER_ENTERING_WORLD()
+   ->   + from me.OptionsCharacter.NPCWorldIDs
+   ->   |    NPCActivate( NpcID, WorldID ) -> ScanAdd() -> TestID()
+   ->   |    NPCActivate( NpcID, WorldID ) -> ScanAdd() -> TestID()
+   ->   |    NPCActivate( NpcID, WorldID ) -> ScanAdd() -> TestID()
+   ->   |    ...
+   ->   + from me.OptionsCharacter.Achievements
+   ->        AchievementActivate(Achievement)
+   ->           Achievement.Criteria
+   ->              AchievementNPCActivate(Achievement, NpcID, CriteriaID) -> ScanADD()
+   ->              AchievementNPCActivate(Achievement, NpcID, CriteriaID) -> ScanADD()
+   ->              AchievementNPCActivate(Achievement, NpcID, CriteriaID) -> ScanADD()
+   ->        AchievementActivate(Achievement)
+   ->           Achievement.Criteria
+   ->              AchievementNPCActivate(Achievement, NpcID, CriteriaID) -> ScanADD()
+   ->              AchievementNPCActivate(Achievement, NpcID, CriteriaID) -> ScanADD()
+   ->              AchievementNPCActivate(Achievement, NpcID, CriteriaID) -> ScanADD()
+   ->        AchievementActivate(Achievement)
+   ->           Achievement.Criteria
+   ->              AchievementNPCActivate(Achievement, NpcID, CriteriaID) -> ScanADD()
+   ->              AchievementNPCActivate(Achievement, NpcID, CriteriaID) -> ScanADD()
+   ->              AchievementNPCActivate(Achievement, NpcID, CriteriaID) -> ScanADD()
+   ->        ...
+   ->
+   -> Frame:Show()
+
+]]
+
+
+
 
 local me = select( 2, ... );
 _NPCScan = me;
@@ -28,9 +68,11 @@ me.OptionsDefault = {
    AlertSoundUnmute = nil;
    AlertSound = nil; -- Default sound
 };
+
 me.OptionsCharacterDefault = {
    Version = me.Version;
    NPCs = {
+      [ 8208 ] = L.NPCs[ 8208 ]; -- Murderous Blisterpaw
       [ 18684 ] = L.NPCs[ 18684 ]; -- Bro'Gaz the Clanless
       [ 32491 ] = L.NPCs[ 32491 ]; -- Time-Lost Proto Drake
       [ 33776 ] = L.NPCs[ 33776 ]; -- Gondria
@@ -50,6 +92,7 @@ me.OptionsCharacterDefault = {
    };
 };
 
+me.EnemyDB = { ["heal"] = { "Starving Blisterpaw", "Murderous Blisterpaw" }};
 
 me.Achievements = { --- Criteria data for each achievement.
    [ 1312 ] = { WorldID = 3; }; -- Bloody Rare (Outlands)
@@ -59,7 +102,6 @@ me.ContinentIDs = {}; --- [ Localized continent name ] = Continent ID (mirrors W
 
 me.NpcIDMax = 0xFFFFF; --- Largest ID that will fit in a GUID's 20-bit NPC ID field.
 me.Frame.UpdateRate = 0.1;
-
 
 
 
@@ -96,6 +138,8 @@ do
    -- @param Relist  True to relist NPC names that have already been printed.
    -- @return List string, or nil if the list was empty.
    function CacheListBuild ( self, Relist )
+      me.Print("inside me.CacheListBuild");
+
       if ( next( self ) ) then
          -- Build and sort list
          for NpcID, Name in pairs( self ) do
@@ -157,35 +201,47 @@ do
 end
 
 
-
-
 local next, assert = next, assert;
 
+--[[ scanIDs format: { [8208] = 32; [NpcId] = zone_area_id; ... };
+--]]
 local ScanIDs = {}; --- [ NpcID ] = Number of concurrent scans for this ID
+
 --- Begins searching for an NPC.
 -- @return True if successfully added.
 local function ScanAdd ( NpcID )
+   --me.Print("ScanAdd ====================="..NpcID)
    local Name = me.TestID( NpcID );
+   --local Name = nil; -- force to add the npc ---> Frame:Show() will be called
+
    if ( Name ) then -- Already seen
       CacheList[ NpcID ] = Name;
+
    else -- Increment
       if ( ScanIDs[ NpcID ] ) then
          ScanIDs[ NpcID ] = ScanIDs[ NpcID ] + 1;
+
       else
          if ( not next( ScanIDs ) ) then -- First
+            me.Print("me.Frame:Show() is called for NpcID: "..NpcID);
             me.Frame:Show();
          end
+
          ScanIDs[ NpcID ] = 1;
          me.Overlays.Add( NpcID );
       end
+
       return true; -- Successfully added
    end
 end
+
 --- Stops searching for an NPC when nothing is searching for it.
 local function ScanRemove ( NpcID )
    local Count = assert( ScanIDs[ NpcID ], "Attempt to remove inactive scan." );
    if ( Count > 1 ) then
-      ScanIDs[ NpcID ] = Count - 1;
+      --ScanIDs[ NpcID ] = Count - 1;
+      ScanIDs[ NpcID ] = 1;
+
    else
       ScanIDs[ NpcID ] = nil;
       me.Overlays.Remove( NpcID );
@@ -208,12 +264,16 @@ do
    local NPCsActive = {};
    --- Starts actual scan for NPC if on the right world.
    function NPCActivate ( NpcID, WorldID )
+      NPCsActive[ NpcID ] = false; -- force to activate it again always
+      --me.Print("--- NPCActivate()");
+
       if ( not NPCsActive[ NpcID ] and IsWorldIDActive( WorldID ) and ScanAdd( NpcID ) ) then
          NPCsActive[ NpcID ] = true;
          me.Config.Search.UpdateTab( "NPC" );
          return true; -- Successfully activated
       end
    end
+
    --- Ends actual scan for NPC.
    function NPCDeactivate ( NpcID )
       if ( NPCsActive[ NpcID ] ) then
@@ -223,6 +283,7 @@ do
          return true; -- Successfully deactivated
       end
    end
+
    --- @return True if a custom NPC is actively being searched for.
    function me.NPCIsActive ( NpcID )
       return NPCsActive[ NpcID ];
@@ -234,12 +295,17 @@ end
 -- @param WorldID  Number or localized string WorldID to limit this search to.
 -- @return True if custom NPC added.
 function me.NPCAdd ( NpcID, Name, WorldID )
+   --me.Print("me.NPCAdd "..NpcID);
+
    NpcID = assert( tonumber( NpcID ), "NpcID must be numeric." );
    local Options = me.OptionsCharacter;
    if ( not Options.NPCs[ NpcID ] ) then
       assert( type( Name ) == "string", "Name must be a string." );
       assert( WorldID == nil or type( WorldID ) == "string" or type( WorldID ) == "number", "Invalid WorldID." );
       Options.NPCs[ NpcID ], Options.NPCWorldIDs[ NpcID ] = Name, WorldID;
+
+      --me.Print("calling NPCActivate() from NPCAdd()");
+
       if ( not NPCActivate( NpcID, WorldID ) ) then -- Didn't activate
          me.Config.Search.UpdateTab( "NPC" ); -- Just add row
       end
@@ -266,6 +332,11 @@ end
 
 --- Starts searching for an achievement's NPC if it meets all settings.
 local function AchievementNPCActivate ( Achievement, NpcID, CriteriaID )
+   --if (Achievement.Active and not Achievement.NPCsActive[ NpcID ]
+   --    and ( me.Options.AchievementsAddFound or not select( 3, GetAchievementCriteriaInfo( CriteriaID ) ) )) then
+   --   me.Print("calling ScanAdd( NpcID ) from AchievementNPCActivate()");
+   --end
+
    if ( Achievement.Active and not Achievement.NPCsActive[ NpcID ]
         and ( me.Options.AchievementsAddFound or not select( 3, GetAchievementCriteriaInfo( CriteriaID ) ) ) -- Not completed
         and ScanAdd( NpcID )
@@ -289,6 +360,7 @@ local function AchievementActivate ( Achievement )
    if ( not Achievement.Active and IsWorldIDActive( Achievement.WorldID ) ) then
       Achievement.Active = true;
       for CriteriaID, NpcID in pairs( Achievement.Criteria ) do
+         --me.Print(" from Achievement.Criteria  -> AchievementNPCActivate() "..NpcID);
          AchievementNPCActivate( Achievement, NpcID, CriteriaID );
       end
       return true;
@@ -397,6 +469,7 @@ end
 
 --- Resets the scanning list and reloads it from saved settings.
 function me.Synchronize ( Options, OptionsCharacter )
+   --print("NPCScan.me.Synchronize -- called")
    -- Load defaults if settings omitted
    local IsDefaultScan, IsHunter;
    if ( not Options ) then
@@ -424,6 +497,7 @@ function me.Synchronize ( Options, OptionsCharacter )
    for NpcID, Name in pairs( OptionsCharacter.NPCs ) do
       -- If defaults, only add tamable custom mobs if the player is a hunter
       if ( not IsDefaultScan or IsHunter or not me.TamableIDs[ NpcID ] ) then
+         --me.Print("calling me.NPCAdd from Synchronize()");
          me.NPCAdd( NpcID, Name, OptionsCharacter.NPCWorldIDs[ NpcID ] );
       end
    end
@@ -460,6 +534,7 @@ do
 
    --- @return True if the tamable mob is in its correct zone, else false with an optional reason string.
    local function OnFoundTamable ( NpcID, Name )
+      print("NPCScan.OnFoundTamable --- is called");
       local ExpectedZone = me.TamableIDs[ NpcID ];
       local ZoneIDBackup = GetCurrentMapAreaID() - 1;
       SetMapToCurrentZone();
@@ -494,6 +569,7 @@ do
    end
    --- Validates found mobs before showing alerts.
    local function OnFound ( NpcID, Name )
+      print("NPCScan.OnFound --- is called");
       -- Disable active scans
       NPCDeactivate( NpcID );
       for AchievementID in pairs( me.OptionsCharacter.Achievements ) do
@@ -537,8 +613,12 @@ do
    end
 
    local NextUpdate = 0;
-   --- Scans all NPCs on a timer and alerts if any are found.
+   --[[ Scans all NPCs on a timer and alerts if any are found.
+      This will be triggered/deactivated when me.Frame:Show()/Hide() are called.
+   --]]
    function me.Frame:OnUpdate ( Elapsed )
+      --me.Print("===> within timer: me.Frame:OnUpdate <===");
+
       NextUpdate = NextUpdate - Elapsed;
       if ( NextUpdate <= 0 ) then
          LastUpdate = self.UpdateRate;
@@ -554,11 +634,15 @@ do
                OnFound( NpcID, Name );
             end
          end
+
+         -- Kevin Test
+         --for index, name in pairs({"Starving Blisterpaw"}) do
+         --   OnFound( 8208, "Murderous Blisterpaw" );
+         --end
+
       end
    end
 end
-
-
 
 
 --- Loads defaults, validates settings, and starts scan.
@@ -570,6 +654,38 @@ function me.Frame:PLAYER_LOGIN ( Event )
    local OptionsCharacter = _NPCScanOptionsCharacter;
    _NPCScanOptions = me.Options;
    _NPCScanOptionsCharacter = me.OptionsCharacter;
+
+
+   -- Kevin forced config
+   _NPCScan.Button:SetPoint("CENTER",
+                            UIParent,
+                            -225,
+                            2);
+   me.Overlays.Register();
+   
+   if (true) then
+      return;
+   end
+   -- End of Kevin Forced config
+
+
+   -- Button Position
+   if (OptionsCharacter
+       and OptionsCharacter.LastPoint
+       and OptionsCharacter.LastPoint.point
+       and OptionsCharacter.LastPoint.xOfs
+       and OptionsCharacter.LastPoint.yOfs) then
+      local p, r, rp, xofs, yofs = _NPCScan.Button:GetPoint();
+
+      if (p ~= OptionsCharacter.LastPoint.point
+          or xofs ~= OptionsCharacter.LastPoint.xOfs
+          or yofs ~= OptionsCharacter.LastPoint.yOfs) then
+         _NPCScan.Button:SetPoint(OptionsCharacter.LastPoint.point,
+                                  UIParent,
+                                  OptionsCharacter.LastPoint.xOfs,
+                                  OptionsCharacter.LastPoint.yOfs);
+      end
+   end
 
    -- Update settings incrementally
    if ( Options and Options.Version ~= me.Version ) then
@@ -632,8 +748,16 @@ do
    local FirstWorld = true;
    --- Starts world-specific scans when entering a world.
    function me.Frame:PLAYER_ENTERING_WORLD ()
+      me.Print("me.Frame:PLAYER_ENTERING_WORLD ()");
       -- Print cached pets if player ported out of a city
       self:PLAYER_UPDATE_RESTING();
+
+      -- Save LastPoint
+      local p, r, rp, xofs, yofs = _NPCScan.Button:GetPoint();
+      _NPCScanOptionsCharacter.LastPoint = _NPCScanOptionsCharacter.LastPoint or {};
+      _NPCScanOptionsCharacter.LastPoint.point = _NPCScanOptionsCharacter.LastPoint.point or p;
+      _NPCScanOptionsCharacter.LastPoint.xOfs = _NPCScanOptionsCharacter.LastPoint.xOfs or xofs;
+      _NPCScanOptionsCharacter.LastPoint.yOfs = _NPCScanOptionsCharacter.LastPoint.yOfs or yofs;
 
       -- Since real MapIDs aren't available to addons, a "WorldID" is a universal ContinentID or the map's localized name.
       local MapName = GetInstanceInfo();
@@ -641,11 +765,18 @@ do
 
       -- Activate scans on this world
       for NpcID, WorldID in pairs( me.OptionsCharacter.NPCWorldIDs ) do
+         --me.Print("me.OptionsCharacter.NPCWorldIDs --->  NPCActivate() -- "..NpcID);
          NPCActivate( NpcID, WorldID );
       end
+
+      --Kevin Test
+      --NPCActivate( 8208, 161 );
+      --
+
       for AchievementID in pairs( me.OptionsCharacter.Achievements ) do
          local Achievement = me.Achievements[ AchievementID ];
          if ( Achievement.WorldID ) then
+            --me.Print("me.OptionsCharacter.Achievements --->  AchievementActivate() -- "..Achievement.WorldID);
             AchievementActivate( Achievement );
          end
       end
@@ -683,11 +814,14 @@ function me.Frame:ACHIEVEMENT_EARNED ( _, AchievementID )
 end
 --- Sets the OnUpdate handler only after zone info is known.
 function me.Frame:ZONE_CHANGED_NEW_AREA ( Event )
+   me.Print("within me.Frame:ZONE_CHANGED_NEW_AREA ( Event )");
+
    self:UnregisterEvent( Event );
    self[ Event ] = nil;
 
    self:SetScript( "OnUpdate", self.OnUpdate );
 end
+
 --- Global event handler.
 function me.Frame:OnEvent ( Event, ... )
    if ( self[ Event ] ) then
@@ -732,7 +866,16 @@ function me.SlashCommand ( Input )
             me.Print( L.CMD_CACHE_EMPTY, GREEN_FONT_COLOR );
          end
          return;
+
+      elseif ( Command == "TEST" ) then
+         _NPCScan.Config.Test:OnClick(Arguments);
+         return;
+
+      elseif ( Command == "NPC" ) then
+         _NPCScan.Config.Test:OnNpc(tonumber(Arguments));
+         return;
       end
+
       -- Invalid subcommand
       me.Print( L.CMD_HELP );
 
@@ -763,7 +906,12 @@ end
 
 
 local Frame = me.Frame;
+
+--[[ Frame:Show() to trigger timmer, Frame:Hide() to deactivate timer
+   timer event on :OnUpdate()
+--]]
 Frame:Hide();
+
 Frame:SetScript( "OnEvent", Frame.OnEvent );
 if ( not IsLoggedIn() ) then
    Frame:RegisterEvent( "PLAYER_LOGIN" );
@@ -781,3 +929,17 @@ else -- Zone information is known
 end
 
 SlashCmdList[ "_NPCSCAN" ] = me.SlashCommand;
+
+
+--local ONUPDATE_INTERVAL = 0.1
+--local TimeSinceLastUpdate = 0;
+--Frame:SetScript("OnUpdate", function(self, elapsed)
+--                   TimeSinceLastUpdate = TimeSinceLastUpdate + elapsed
+--
+--                   if TimeSinceLastUpdate >= ONUPDATE_INTERVAL then
+--                      TimeSinceLastUpdate = 0
+--
+--                      me.Print("calling frame's onUpdate-----elapsed: "..elapsed);
+--                      -- Do stuff
+--                   end
+--end);

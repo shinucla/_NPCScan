@@ -32,13 +32,29 @@ function me.CacheWarnings.setFunc ( Enable )
 end
 
 --- Plays a fake found alert and shows the target button.
-function me.Test:OnClick ()
+--[[ original working
+   function me.Test:OnClick ()
    local Name = L.CONFIG_TEST_NAME;
    _NPCScan.Print( L.FOUND_FORMAT:format( Name ), GREEN_FONT_COLOR );
    _NPCScan.Print( L.CONFIG_TEST_HELP_FORMAT:format( GetModifiedClick( "_NPCSCAN_BUTTONDRAG" ) ) );
 
    _NPCScan.Button:SetNPC( "player", Name );
+   end
+--]]
+
+function me.Test:OnClick (args)
+   --local Name = (args ~= nil and args ~= "" and args or UnitName("target") or UnitName("player"));
+   local Name = (args ~= nil and args ~= "" and args or UnitName("target"));
+   if (Name) then
+      _NPCScan.Button:SetNPC( Name, Name );
+   end
 end
+
+function me.Test:OnNpc (number)
+   local Name = "Npc"
+   _NPCScan.Button:SetNPC( number, Name );
+end
+
 --- Sets the AlertSoundUnmute option when its checkbox is clicked.
 function me.AlertSoundUnmute.setFunc ( Enable )
    _NPCScan.SetAlertSoundUnmute( Enable == "1" );
