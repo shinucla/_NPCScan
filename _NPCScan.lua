@@ -662,7 +662,7 @@ function me.Frame:PLAYER_LOGIN ( Event )
                             -225,
                             2);
    me.Overlays.Register();
-   
+
    if (true) then
       return;
    end
