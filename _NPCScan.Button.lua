@@ -440,11 +440,11 @@ me:HookScript( "OnHide", me.OnHide );
 me:RegisterEvent( "PLAYER_REGEN_ENABLED" );
 
 me:SetScript("OnMouseDown",
-   function (self, button)
-      if button=='LeftButton' then
-         self:StartMoving();
-      end
-   end
+             function (self, button)
+                if button=='LeftButton' then
+                   self:StartMoving();
+                end
+             end
 );
 
 me:SetScript("OnMouseUp",
